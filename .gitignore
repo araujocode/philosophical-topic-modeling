@@ -11,6 +11,8 @@ env/
 # SQLite database file
 data/sep.db
 
+data/processed/
+
 # VSCode settings
 .vscode/
 
