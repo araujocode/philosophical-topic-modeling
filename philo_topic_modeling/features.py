@@ -6,7 +6,7 @@ from philo_topic_modeling.config import PROCESSED_DIR
 # ensure processed dir exists
 os.makedirs(PROCESSED_DIR, exist_ok=True)
 
-TFIDF_PATH = os.path.join(PROCESSED_DIR, "tfidf.joblib")
+TFIDF_PATH = os.path.join(PROCESSED_DIR, "tfidf_pipeline.joblib")
 
 
 class FeatureExtractor:
