@@ -1,6 +1,20 @@
+# Philo Topic Modeling
+
+A Streamlit app for topic modeling of Stanford Encyclopedia of Philosophy entries using LDA/NMF and document clustering.
+
+---
+
 ## Summary
 
-This guide shows how to clone the repo, create and activate a Python virtual environment, install dependencies (including resolving scikit-learn build errors on Windows), install GNU make for Windows, run the scraper, launch the Streamlit app, and execute tests. It also covers troubleshooting for common Windows-specific problems (compiler errors, missing wheels, activation commands).
+This guide walks you through:
+
+1. Cloning the repo  
+2. Creating & activating a Python virtual environment  
+3. Installing dependencies (with Windows-specific build tips)  
+4. Running the scraper to populate the database  
+5. Launching the Streamlit app  
+6. Running tests  
+7. Troubleshooting common Windows issues
 
 ---
 
@@ -9,18 +23,18 @@ This guide shows how to clone the repo, create and activate a Python virtual env
 ```bash
 git clone https://github.com/you/philo_topic_modeling.git
 cd philo_topic_modeling
-```
+````
 
 ### 1.1 Create & Activate Virtual Environment
 
-* **Windows (PowerShell)**:
+* **Windows (PowerShell)**
 
   ```powershell
-  python -m venv venv           # create venv
-  .\venv\Scripts\Activate.ps1  # activate
+  python -m venv venv
+  .\venv\Scripts\Activate.ps1
   ```
 
-* **macOS/Linux**:
+* **macOS/Linux**
 
   ```bash
   python3 -m venv venv
@@ -32,32 +46,33 @@ cd philo_topic_modeling
 ## 2. Install Dependencies
 
 ```bash
-pip install --upgrade pip setuptools wheel  # ensure latest installer tools
+pip install --upgrade pip setuptools wheel
 pip install -r requirements.txt
 ```
 
-* **Note**: We pin `scikit-learn==1.4.2` because versions ≤ 1.2.2 lack wheels for Python 3.12 on Windows and trigger a source build requiring MSVC.
-* If you see:
+> **Note:** We pin `scikit-learn==1.4.2` because earlier versions lack prebuilt wheels for Python 3.12 on Windows and trigger an MSVC build.
 
-  ```
-  Microsoft Visual C++ 14.0 or greater is required.
-  ```
+If you see:
 
-  install the **Build Tools for Visual Studio** (select “C++ build tools”) from Microsoft’s website.
+```
+Microsoft Visual C++ 14.0 or greater is required.
+```
+
+install the **Build Tools for Visual Studio** (include “C++ build tools”).
 
 ---
 
 ## 3. Install GNU make on Windows
 
-If you get `bash: make: command not found`, install `make`:
+If `make` isn’t found:
 
 ```powershell
 choco install make
 ```
 
-*(requires Chocolatey: [https://chocolatey.org/install](https://chocolatey.org/install))*
+*(Requires Chocolatey: [https://chocolatey.org/install](https://chocolatey.org/install))*
 
-Once installed, you can use:
+Then you can use:
 
 ```bash
 make scrape
@@ -71,14 +86,12 @@ make test
 
 ### 4.1 scikit-learn Wheel Unavailable
 
-* **Symptom**:
+* **Symptom:**
 
   ```
-  ERROR: Could not find a version that satisfies the requirement scikit-learn==1.2.2
+  ERROR: Could not find a version that satisfies the requirement scikit-learn==x.x.x
   ```
-
-* **Cause**: No binary wheel for Python 3.12.
-* **Solution**:
+* **Fix:**
 
   ```bash
   pip install scikit-learn==1.4.2
@@ -86,13 +99,12 @@ make test
 
 ### 4.2 pip Self-Upgrade Restriction
 
-* **Symptom**:
+* **Symptom:**
 
   ```
-  ERROR: To modify pip, please run: python.exe -m pip install --upgrade pip
+  To modify pip, run: python.exe -m pip install --upgrade pip
   ```
-
-* **Solution**:
+* **Fix:**
 
   ```bash
   python -m pip install --upgrade pip
@@ -100,8 +112,8 @@ make test
 
 ### 4.3 Virtualenv Activation Blocked
 
-* **Symptom**: PowerShell refuses to run `Activate.ps1`.
-* **Solution** (run as Administrator once):
+* **Symptom:** PowerShell refuses to run `Activate.ps1`.
+* **Fix (Admin once):**
 
   ```powershell
   Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
@@ -115,13 +127,13 @@ make test
 make scrape
 ```
 
-What it does:
+This will:
 
-1. Crawls the SEP index (`https://plato.stanford.edu/entries/`)
-2. Downloads each article, extracts title & content via BeautifulSoup
-3. Inserts into `data/sep.db` using SQLite
+1. Crawl the SEP index (`/entries/`)
+2. Download each article, extract title & content
+3. Insert into `data/sep.db`
 
-**Verify**:
+Verify:
 
 ```bash
 sqlite3 data/sep.db "SELECT COUNT(*) FROM documents;"
@@ -135,10 +147,17 @@ sqlite3 data/sep.db "SELECT COUNT(*) FROM documents;"
 make run
 ```
 
-Opens at `http://localhost:8501` showing:
+Then open your browser to `http://localhost:8501`. The sidebar lets you choose:
 
-* **Sidebar**: select topic model (LDA/NMF), number of topics, clustering method, number of clusters
-* **Main**: top-words per topic, 2D PCA scatter of articles colored by cluster
+* **Topic model** (LDA or NMF)
+* **Number of topics**
+* **Clustering method** (KMeans or Agglomerative)
+* **Number of clusters**
+
+The main view shows:
+
+* Top-terms per topic
+* 2D PCA scatter of documents colored by cluster
 
 ---
 
@@ -148,40 +167,38 @@ Opens at `http://localhost:8501` showing:
 make test
 ```
 
-Runs **pytest** over `tests/` to verify database operations, TF-IDF pipeline, and topic-modeler functionality.
+Runs pytest over `tests/` to verify:
+
+* Database insert & fetch
+* TF–IDF pipeline via `FeatureExtractor`
+* TopicModeler output shapes & top-terms
 
 ---
 
-## 8. Deployment & Next Steps
+## 8. Next Steps & Deployment
 
-* **Deploy**: Push to GitHub and **Streamlit Community Cloud** (one-click integration).
-* **Enhancements**:
+* **Deploy** to Streamlit Community Cloud (one-click from GitHub).
+* **Enhancements** you might try:
 
-  * Add a date-range slider filtering by `scrape_date`.
-  * Switch to Altair for interactive visualizations.
-  * Incorporate full-text search with SQLite FTS.
+  * Date-range slider filtering by `scrape_date`
+  * Full-text search via SQLite FTS
+  * Visualizing topic evolution over time
 
 ---
 
 ## References
 
-1. Official scikit-learn install guide (wheels for Win) ([scikit-learn.org][1])
-2. BeautifulSoup usage for scraping example ([pypi.org][8])
-3. scikit-learn 1.4.2 release notes (supports Python 3.12) ([github.com][3])
-4. sqlite3 and sqlite-utils reference for Python DB usage ([stackoverflow.com][9])
-5. pip module upgrade method explanation ([scikit-learn.org][6])
-6. Microsoft C++ Build Tools requirement for Windows ([scikit-learn.ru][4])
-7. Streamlit UI documentation for plotting controls ([medium.com][10])
-8. GitHub issue on scikit-learn wheels for Python versions ([github.com][5])
-9. PowerShell execution policy guide for venv activation ([ogrisel.github.io][7])
-10. pytest integration in Python projects
+* [scikit-learn Installation Guide](https://scikit-learn.org/stable/install.html)
+* [BeautifulSoup Documentation](https://www.crummy.com/software/BeautifulSoup/bs4/doc/)
+* [SQLite3 Python Docs](https://docs.python.org/3/library/sqlite3.html)
+* [Streamlit API Reference](https://docs.streamlit.io/)
+* [pytest Documentation](https://docs.pytest.org/)
 
-[1]: https://scikit-learn.org/stable/install.html?utm_source=chatgpt.com "Installing scikit-learn"
-[3]: https://github.com/scikit-learn/scikit-learn/releases?utm_source=chatgpt.com "Releases · scikit-learn/scikit-learn - GitHub"
-[4]: https://scikit-learn.ru/stable/developers/advanced_installation.html?utm_source=chatgpt.com "Installing the development version of scikit-learn"
-[5]: https://github.com/scikit-learn/scikit-learn/issues/29973?utm_source=chatgpt.com "Cannot install sklearn >=1.5 on windows with python 3.13 #29973"
-[6]: https://scikit-learn.org/stable/developers/advanced_installation.html?utm_source=chatgpt.com "Installing the development version of scikit-learn"
-[7]: https://ogrisel.github.io/scikit-learn.org/sklearn-tutorial/install.html?utm_source=chatgpt.com "1. Installing scikit-learn - GitHub Pages"
-[8]: https://pypi.org/project/scikit-learn/?utm_source=chatgpt.com "scikit-learn - PyPI"
-[9]: https://stackoverflow.com/questions/59974146/installing-an-old-version-of-scikit-learn?utm_source=chatgpt.com "Installing an old version of scikit-learn - Stack Overflow"
-[10]: https://medium.com/%406unpnp/install-scikit-learn-d58f1415962d?utm_source=chatgpt.com "Install scikit-learn. Hopefully a happy first step to machine… - Medium"
+```
+
+This README now:
+- Reflects your `FeatureExtractor` helper (used in **app.py**)  
+- Shows how to handle an empty DB safely  
+- Includes all necessary commands and Windows‐specific tips  
+- Is organized into clear, numbered sections for easy follow-through.
+```

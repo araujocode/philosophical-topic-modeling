@@ -1,8 +1,9 @@
 import streamlit as st
 import pandas as pd
+import altair as alt
 from sklearn.decomposition import PCA
 from philo_topic_modeling.db import DatabaseManager
-from philo_topic_modeling.pipeline import FeaturePipeline
+from philo_topic_modeling.features import FeatureExtractor
 from philo_topic_modeling.topic_model import TopicModeler
 from philo_topic_modeling.cluster import Clusterer
 from philo_topic_modeling.config import DB_PATH, N_TOPICS, N_CLUSTERS
@@ -11,43 +12,73 @@ from philo_topic_modeling.config import DB_PATH, N_TOPICS, N_CLUSTERS
 class StreamlitApp:
     def __init__(self):
         st.title("Philosophical Topic Modeling")
-        self.db = DatabaseManager(DB_PATH)
-        docs = self.db.fetch_all()
-        self.ids, self.titles, self.texts = zip(*docs)
-        self.feature_pipe = FeaturePipeline()
-        self.X = self.feature_pipe.fit_transform(self.texts)
 
-        # Sidebar
-        method = st.sidebar.selectbox("Topic Model", ["lda", "nmf"])
-        n_topics = st.sidebar.slider("Number of Topics", 5, 20, N_TOPICS)
-        clust_method = st.sidebar.selectbox("Clustering", ["kmeans", "agg"])
-        n_clusters = st.sidebar.slider("Clusters", 2, 10, N_CLUSTERS)
+        # --- Load documents from SQLite ---
+        db = DatabaseManager(DB_PATH)
+        try:
+            rows = db.fetch_all()  # [(id, title, content), ...]
+            if not rows:
+                st.warning("No documents found. Run the scraper first.")
+                return
 
-        # Modeling
-        tm = TopicModeler(n_topics=n_topics, method=method)
-        theta = tm.fit_transform(self.X)
-        topics = tm.get_topics(self.feature_pipe.pipe.named_steps["tfidf"], n_top=8)
+            self.ids, self.titles, self.texts = zip(*rows)
 
-        # Clustering
-        cl = Clusterer(method=clust_method, n_clusters=n_clusters)
-        labels = cl.fit_predict(theta)
+            # --- Feature extraction via FeatureExtractor ---
+            feat = FeatureExtractor(db, max_df=0.85, min_df=5, ngram_range=(1, 2))
+            X = feat.fit_transform()
+            if X is None:
+                st.warning("Feature extraction returned no data.")
+                return
 
-        # Display topics
-        for i, words in enumerate(topics):
-            st.subheader(f"Topic {i}")
-            st.write(", ".join(words))
+            # --- Sidebar controls ---
+            method = st.sidebar.selectbox("Topic Model", ["lda", "nmf"])
+            n_topics = st.sidebar.slider("Number of Topics", 5, 20, N_TOPICS)
+            clust_method = st.sidebar.selectbox("Clustering", ["kmeans", "agg"])
+            n_clusters = st.sidebar.slider("Number of Clusters", 2, 10, N_CLUSTERS)
 
-        # 2D projection
-        pca = PCA(2)
-        coords = pca.fit_transform(theta)
-        df = pd.DataFrame(coords, columns=["x", "y"])
-        df["title"] = self.titles
-        df["cluster"] = labels
-        st.write("### Document Clusters")
-        st.altair_chart(
-            (st.altair_chart(st.altair_chart(st.altair_chart(st.altair_chart(None)))))
-        )
-        st.map()
+            # --- Topic modeling ---
+            tm = TopicModeler(n_topics=n_topics, method=method)
+            theta = tm.fit_transform(X)
+
+            # get TF–IDF vectorizer to extract terms
+            vectorizer = feat.get_vectorizer()
+            topics = tm.get_topics(vectorizer, n_top=8)
+
+            # --- Clustering on topic vectors ---
+            cl = Clusterer(method=clust_method, n_clusters=n_clusters)
+            labels = cl.fit_predict(theta)
+
+            # --- Display topics ---
+            st.header("Top Terms per Topic")
+            cols = st.columns(2)
+            for i, words in enumerate(topics):
+                with cols[i % 2]:
+                    st.subheader(f"Topic {i+1}")
+                    st.markdown(", ".join(f"`{w}`" for w in words))
+
+            # --- 2D projection of documents in topic-space ---
+            pca = PCA(n_components=2, random_state=42)
+            coords = pca.fit_transform(theta)
+            df = pd.DataFrame(coords, columns=["x", "y"])
+            df["title"] = self.titles
+            df["cluster"] = labels.astype(str)
+
+            st.header("Document Clusters (PCA projection)")
+            chart = (
+                alt.Chart(df)
+                .mark_circle(size=60)
+                .encode(
+                    x="x:Q",
+                    y="y:Q",
+                    color="cluster:N",
+                    tooltip=["title:N", "cluster:N"],
+                )
+                .interactive()
+            )
+            st.altair_chart(chart, use_container_width=True)
+
+        finally:
+            db.close()
 
 
 if __name__ == "__main__":

@@ -70,7 +70,7 @@ class SEPScraper:
         title = h1.get_text(strip=True)
 
         # 2. Main article text lives in <div id="main-text">
-        main_div = soup.find("div", id="main-text")  # § HTML structure
+        main_div = soup.find("div", id="main-text") 
         if not main_div:
             raise RuntimeError(f"No <div id='main-text'> for slug '{slug}'")
 
