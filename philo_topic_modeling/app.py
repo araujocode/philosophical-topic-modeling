@@ -2,23 +2,43 @@ import os
 import streamlit as st
 import pandas as pd
 import altair as alt
+from joblib import load, dump
 from sklearn.decomposition import PCA
 
 from philo_topic_modeling.db import DatabaseManager
 from philo_topic_modeling.features import FeatureExtractor
 from philo_topic_modeling.topic_model import TopicModeler
 from philo_topic_modeling.cluster import Clusterer
-from philo_topic_modeling.config import DB_PATH, N_TOPICS, N_CLUSTERS, PROCESSED_DIR
+from philo_topic_modeling.config import (
+    DB_PATH,
+    N_TOPICS,
+    N_CLUSTERS,
+    PROCESSED_DIR,
+)
 
-# ensure processed dir exists
+# 1. Ensure processed-dir exists
 os.makedirs(PROCESSED_DIR, exist_ok=True)
+
+# 2. Define persisted artifact paths
+TFIDF_PATH = os.path.join(PROCESSED_DIR, "tfidf_pipeline.joblib")
+MODEL_PATH_TMPL = os.path.join(PROCESSED_DIR, "topics_{method}.joblib")
 
 
 class StreamlitApp:
     def __init__(self):
         st.title("Philosophical Topic Modeling")
 
-        # --- Load documents from SQLite ---
+        # --- Sidebar: Option to force re-fit ---
+        if st.sidebar.button("🔄 Re-fit all models"):
+            for p in [TFIDF_PATH] + [
+                MODEL_PATH_TMPL.format(method=m) for m in ("lda", "nmf")
+            ]:
+                if os.path.exists(p):
+                    os.remove(p)
+            st.sidebar.success("Cleared persisted models. Reload to re-fit.")
+            st.experimental_rerun()
+
+        # --- Load documents ---
         db = DatabaseManager(DB_PATH)
         try:
             rows = db.fetch_all()
@@ -26,14 +46,11 @@ class StreamlitApp:
                 st.warning("⚠️ No documents found. Run `make scrape` first.")
                 return
 
-            self.ids, self.titles, self.texts = zip(*rows)
+            ids, titles, texts = zip(*rows)
 
             # --- Feature extraction (load or fit & save) ---
             feat = FeatureExtractor(db, max_df=0.85, min_df=5, ngram_range=(1, 2))
-            X = feat.load_or_transform()
-            if X.shape[0] == 0:
-                st.warning("⚠️ Feature extraction returned no data.")
-                return
+            X = self._load_or_fit_tfidf(feat)
 
             # --- Sidebar controls ---
             method = st.sidebar.selectbox("Topic Model", ["lda", "nmf"])
@@ -41,19 +58,16 @@ class StreamlitApp:
             clust_method = st.sidebar.selectbox("Clustering", ["kmeans", "agg"])
             n_clusters = st.sidebar.slider("Number of Clusters", 2, 10, N_CLUSTERS)
 
-            # --- Topic modeling (load/save inside) ---
-            tm = TopicModeler(n_topics=n_topics, method=method)
-            theta = tm.fit_transform(X)
+            # --- Topic modeling (load or fit & save) ---
+            theta, topics = self._load_or_fit_topic_model(
+                X, feat.get_vectorizer(), n_topics, method
+            )
 
-            # get TF–IDF vectorizer to extract terms
-            vectorizer = feat.get_vectorizer()
-            topics = tm.get_topics(vectorizer, n_top=8)
-
-            # --- Clustering on topic vectors ---
+            # --- Clustering ---
             cl = Clusterer(method=clust_method, n_clusters=n_clusters)
             labels = cl.fit_predict(theta)
 
-            # --- Display topics ---
+            # --- Display top‐terms per topic ---
             st.header("Top Terms per Topic")
             cols = st.columns(2)
             for i, words in enumerate(topics):
@@ -61,11 +75,11 @@ class StreamlitApp:
                     st.subheader(f"Topic {i+1}")
                     st.markdown(", ".join(f"`{w}`" for w in words))
 
-            # --- 2D projection of documents in topic-space ---
+            # --- 2D PCA projection ---
             pca = PCA(n_components=2, random_state=42)
             coords = pca.fit_transform(theta)
             df = pd.DataFrame(coords, columns=["x", "y"])
-            df["title"] = self.titles
+            df["title"] = titles
             df["cluster"] = labels.astype(str)
 
             st.header("Document Clusters (PCA projection)")
@@ -84,6 +98,45 @@ class StreamlitApp:
 
         finally:
             db.close()
+
+    def _load_or_fit_tfidf(self, feat: FeatureExtractor):
+        """Load persisted TF–IDF pipeline if available, else fit & save."""
+        if os.path.exists(TFIDF_PATH):
+            st.info("Loading saved TF–IDF pipeline…")
+            feat.pipe = load(TFIDF_PATH)
+            # now transform texts
+            rows = feat.db.fetch_all()
+            _, _, texts = zip(*rows)
+            X = feat.transform(texts)
+        else:
+            st.info("Fitting TF–IDF pipeline…")
+            X = feat.fit_transform()
+            dump(feat.pipe, TFIDF_PATH)
+            st.success(f"✅ Saved TF–IDF pipeline to {TFIDF_PATH}")
+        return X
+
+    def _load_or_fit_topic_model(self, X, vectorizer, n_topics, method):
+        """
+        Load a persisted TopicModeler if available (and matching n_topics+method),
+        else fit & save, then return (theta, top_terms).
+        """
+        model_path = MODEL_PATH_TMPL.format(method=method)
+        tm = TopicModeler(n_topics=n_topics, method=method)
+
+        # We only re-load if n_topics matches saved model metadata.
+        if os.path.exists(model_path):
+            st.info(f"Loading saved {method.upper()} model…")
+            tm.model = load(model_path)
+            theta = tm.model.transform(X)
+            tm.topic_term_ = tm.model.components_
+        else:
+            st.info(f"Fitting {method.upper()} model…")
+            theta = tm.fit_transform(X)
+            dump(tm.model, model_path)
+            st.success(f"✅ Saved {method.upper()} model to {model_path}")
+
+        topics = tm.get_topics(vectorizer, n_top=8)
+        return theta, topics
 
 
 if __name__ == "__main__":
