@@ -18,11 +18,26 @@ This guide walks you through:
 
 ---
 
+## About this Project
+
+**Philo Topic Modeling** is a lightweight, end-to-end framework for exploring the Stanford Encyclopedia of Philosophy (SEP) through unsupervised text-analysis techniques.  
+- **What it does:**  
+  1. **Scrapes** the full text of SEP entries.  
+  2. **Stores** them in a local SQLite database.  
+  3. **Vectorizes** the articles via a TF–IDF pipeline.  
+  4. **Discovers** latent themes using LDA or NMF topic models.  
+  5. **Groups** articles into clusters based on their topic distributions.  
+  6. **Visualizes** results in an interactive Streamlit app (top terms per topic + 2D PCA scatter).  
+- **Why it exists:**  
+  - To make large-scale philosophical text analysis accessible without heavy infrastructure.  
+  - To provide a reusable codebase for teaching or research in digital humanities and NLP.  
+  - To demonstrate clean, object-oriented design around scraping, modeling, and visualization.
+
 ## 1. Clone & Prepare Environment
 
 ```bash
-git clone https://github.com/you/philo_topic_modeling.git
-cd philo_topic_modeling
+git clone https://github.com/araujocode/philosophical_topic_modeling.git
+cd philosophical_topic_modeling
 ````
 
 ### 1.1 Create & Activate Virtual Environment
@@ -50,7 +65,7 @@ pip install --upgrade pip setuptools wheel
 pip install -r requirements.txt
 ```
 
-> **Note:** We pin `scikit-learn==1.4.2` because earlier versions lack prebuilt wheels for Python 3.12 on Windows and trigger an MSVC build.
+> **Note:** We pin `scikit-learn==1.4.2` because earlier versions lack wheels for Python 3.12 on Windows and trigger an MSVC build.
 
 If you see:
 
@@ -76,6 +91,7 @@ Then you can use:
 
 ```bash
 make scrape
+make persist
 make run
 make test
 ```
@@ -113,7 +129,7 @@ make test
 ### 4.3 Virtualenv Activation Blocked
 
 * **Symptom:** PowerShell refuses to run `Activate.ps1`.
-* **Fix (Admin once):**
+* **Fix (run once as Admin):**
 
   ```powershell
   Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
@@ -141,13 +157,28 @@ sqlite3 data/sep.db "SELECT COUNT(*) FROM documents;"
 
 ---
 
-## 6. Run the Streamlit App
+## 6. Persist Processed Artifacts
+
+```bash
+make persist
+```
+
+This fits and saves:
+
+* The TF–IDF pipeline
+* Both LDA and NMF topic models
+
+into `data/processed/` so you can reload without re-scraping or re-vectorizing.
+
+---
+
+## 7. Run the Streamlit App
 
 ```bash
 make run
 ```
 
-Then open your browser to `http://localhost:8501`. The sidebar lets you choose:
+Open your browser to `http://localhost:8501`. The sidebar lets you choose:
 
 * **Topic model** (LDA or NMF)
 * **Number of topics**
@@ -161,7 +192,7 @@ The main view shows:
 
 ---
 
-## 7. Execute Tests
+## 8. Execute Tests
 
 ```bash
 make test
@@ -175,7 +206,7 @@ Runs pytest over `tests/` to verify:
 
 ---
 
-## 8. Next Steps & Deployment
+## 9. Next Steps & Deployment
 
 * **Deploy** to Streamlit Community Cloud (one-click from GitHub).
 * **Enhancements** you might try:
@@ -193,12 +224,3 @@ Runs pytest over `tests/` to verify:
 * [SQLite3 Python Docs](https://docs.python.org/3/library/sqlite3.html)
 * [Streamlit API Reference](https://docs.streamlit.io/)
 * [pytest Documentation](https://docs.pytest.org/)
-
-```
-
-This README now:
-- Reflects your `FeatureExtractor` helper (used in **app.py**)  
-- Shows how to handle an empty DB safely  
-- Includes all necessary commands and Windows‐specific tips  
-- Is organized into clear, numbered sections for easy follow-through.
-```

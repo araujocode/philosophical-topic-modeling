@@ -1,12 +1,17 @@
+import os
 import streamlit as st
 import pandas as pd
 import altair as alt
 from sklearn.decomposition import PCA
+
 from philo_topic_modeling.db import DatabaseManager
 from philo_topic_modeling.features import FeatureExtractor
 from philo_topic_modeling.topic_model import TopicModeler
 from philo_topic_modeling.cluster import Clusterer
-from philo_topic_modeling.config import DB_PATH, N_TOPICS, N_CLUSTERS
+from philo_topic_modeling.config import DB_PATH, N_TOPICS, N_CLUSTERS, PROCESSED_DIR
+
+# ensure processed dir exists
+os.makedirs(PROCESSED_DIR, exist_ok=True)
 
 
 class StreamlitApp:
@@ -16,18 +21,18 @@ class StreamlitApp:
         # --- Load documents from SQLite ---
         db = DatabaseManager(DB_PATH)
         try:
-            rows = db.fetch_all()  # [(id, title, content), ...]
+            rows = db.fetch_all()
             if not rows:
-                st.warning("No documents found. Run the scraper first.")
+                st.warning("⚠️ No documents found. Run `make scrape` first.")
                 return
 
             self.ids, self.titles, self.texts = zip(*rows)
 
-            # --- Feature extraction via FeatureExtractor ---
+            # --- Feature extraction (load or fit & save) ---
             feat = FeatureExtractor(db, max_df=0.85, min_df=5, ngram_range=(1, 2))
-            X = feat.fit_transform()
-            if X is None:
-                st.warning("Feature extraction returned no data.")
+            X = feat.load_or_transform()
+            if X.shape[0] == 0:
+                st.warning("⚠️ Feature extraction returned no data.")
                 return
 
             # --- Sidebar controls ---
@@ -36,7 +41,7 @@ class StreamlitApp:
             clust_method = st.sidebar.selectbox("Clustering", ["kmeans", "agg"])
             n_clusters = st.sidebar.slider("Number of Clusters", 2, 10, N_CLUSTERS)
 
-            # --- Topic modeling ---
+            # --- Topic modeling (load/save inside) ---
             tm = TopicModeler(n_topics=n_topics, method=method)
             theta = tm.fit_transform(X)
 
