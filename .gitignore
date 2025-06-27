@@ -1,0 +1,41 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# SQLite database file
+data/sep.db
+
+data/processed/
+
+# VSCode settings
+.vscode/
+
+# PyCharm settings
+.idea/
+
+# Logs and runtime files
+*.log
+*.pid
+*.seed
+
+# Jupyter Notebooks checkpoints
+.ipynb_checkpoints/
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
